@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090b10">
+<title>VAULT — Money Manager</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#090b10;--panel:#121722;--panel2:#192131;--line:#293448;--text:#f4f6fb;--muted:#929db0;--accent:#c6a56a;--red:#f17c82;--green:#75d6a0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% 0%,#1b2638 0,transparent 34%),var(--bg);color:var(--text);font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom))}
+header{max-width:760px;margin:0 auto;padding:26px 2px 18px;display:flex;justify-content:space-between;align-items:center}h1{font-size:25px;letter-spacing:5px;margin:0;color:var(--accent)}.sub{color:var(--muted);font-size:12px;letter-spacing:2px;margin-top:5px}.month{color:var(--muted);font-size:13px}
+main{max-width:760px;margin:auto}.balance{background:linear-gradient(135deg,#1b2638,#111722 70%);border:1px solid #344158;border-radius:22px;padding:22px;margin-bottom:14px}.eyebrow{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}.amount{font-size:36px;font-weight:700;margin:9px 0 18px;letter-spacing:-1px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}.stat{background:#0d131eaa;border:1px solid #293448;border-radius:14px;padding:13px}.stat b{display:block;font-size:19px;margin-top:6px}.green{color:var(--green)}.red{color:var(--red)}
+.tabs{display:flex;gap:8px;margin:15px 0}.tabs button,.btn{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:11px 14px;border-radius:12px;font-weight:600}.tabs button.active,.primary{background:var(--accent);color:#17130d;border-color:var(--accent)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:17px;margin:12px 0}.panel h2{font-size:16px;margin:0 0 14px}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}input,select{width:100%;background:#0b1019;border:1px solid var(--line);border-radius:11px;padding:13px;color:var(--text);font:inherit;min-width:0}.wide{grid-column:1/-1}.btn{width:100%;margin-top:10px}.list{display:flex;flex-direction:column;gap:9px}.item{display:flex;justify-content:space-between;align-items:center;background:#0d131e;border:1px solid #202b3d;border-radius:13px;padding:12px}.item small{display:block;color:var(--muted);margin-top:4px}.empty{color:var(--muted);text-align:center;padding:22px 8px}.hidden{display:none}.row{display:flex;justify-content:space-between;align-items:center;gap:8px}.tiny{font-size:12px;color:var(--muted)}.danger{color:var(--red);background:transparent;border:0;padding:5px 8px}
+@media(max-width:420px){.amount{font-size:30px}.formgrid{grid-template-columns:1fr}.wide{grid-column:auto}}
+</style>
+</head>
+<body>
+<header><div><h1>VAULT</h1><div class="sub">PERSONAL MONEY MANAGER</div></div><div class="month" id="today"></div></header>
+<main>
+<section class="balance">
+ <div class="eyebrow">Current balance</div><div class="amount" id="balance">LKR 0.00</div>
+ <div class="stats"><div class="stat"><span class="eyebrow">Income</span><b class="green" id="income">LKR 0.00</b></div><div class="stat"><span class="eyebrow">Expenses</span><b class="red" id="expense">LKR 0.00</b></div></div>
+</section>
+<div class="tabs"><button class="active" data-tab="transactions">Overview</button><button data-tab="reports">Reports</button><button data-tab="backup">Backup</button></div>
+<section id="transactions">
+ <div class="panel"><h2>Add transaction</h2>
+ <form id="entry"><div class="formgrid">
+ <select id="type"><option value="expense">Expense</option><option value="income">Income</option></select>
+ <input id="amount" type="number" min="0.01" step="0.01" placeholder="Amount (LKR)" required>
+ <select id="category"><option>Food</option><option>Transport</option><option>Shopping</option><option>Bills</option><option>Health</option><option>Entertainment</option><option>Salary</option><option>Business</option><option>Other</option></select>
+ <input id="date" type="date" required>
+ <input id="note" class="wide" maxlength="80" placeholder="Note (optional)">
+ </div><button class="btn primary" type="submit">Add transaction</button></form></div>
+ <div class="panel"><div class="row"><h2>Recent transactions</h2><span class="tiny" id="count"></span></div><div id="entries" class="list"></div></div>
+</section>
+<section id="reports" class="hidden"><div class="panel"><h2>This month</h2><div id="monthly" class="list"></div></div><div class="panel"><h2>Spending by category</h2><div id="categories" class="list"></div></div></section>
+<section id="backup" class="hidden"><div class="panel"><h2>Your data stays on this device</h2><p class="tiny">Transactions are saved in this browser on this iPhone. Export a backup regularly. Clearing Safari website data may erase your records.</p><button class="btn primary" id="export">Export backup</button><label class="btn" style="display:block;text-align:center;margin-top:10px">Import backup<input id="import" type="file" accept="application/json" hidden></label><button class="btn" id="clear" style="color:var(--red)">Delete all transactions</button></div></section>
+</main>
+<script>
+const KEY='vault_money_manager_v1';let records=[];try{records=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){records=[]}
+const $=id=>document.getElementById(id), money=n=>'LKR '+Number(n||0).toLocaleString('en-LK',{minimumFractionDigits:2,maximumFractionDigits:2});
+$('today').textContent=new Date().toLocaleDateString('en-LK',{month:'short',year:'numeric'});$('date').value=new Date().toISOString().slice(0,10);
+function save(){localStorage.setItem(KEY,JSON.stringify(records));render()}
+function render(){
+ const inc=records.filter(x=>x.type==='income').reduce((s,x)=>s+x.amount,0),exp=records.filter(x=>x.type==='expense').reduce((s,x)=>s+x.amount,0);
+ $('balance').textContent=money(inc-exp);$('income').textContent=money(inc);$('expense').textContent=money(exp);$('count').textContent=records.length+' total';
+ const sorted=[...records].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+ $('entries').innerHTML=sorted.length?sorted.slice(0,40).map(x=>`<div class="item"><div><b>${esc(x.note||x.category)}</b><small>${esc(x.category)} · ${x.date}</small></div><div style="text-align:right"><b class="${x.type==='income'?'green':'red'}">${x.type==='income'?'+':'−'}${money(x.amount)}</b><br><button class="danger" data-del="${x.id}">Delete</button></div></div>`).join(''):'<div class="empty">No transactions yet. Add your first one above.</div>';
+ const month=new Date().toISOString().slice(0,7),m=records.filter(x=>x.date.startsWith(month)),mi=m.filter(x=>x.type==='income').reduce((s,x)=>s+x.amount,0),me=m.filter(x=>x.type==='expense').reduce((s,x)=>s+x.amount,0);
+ $('monthly').innerHTML=`<div class="item"><span>Income</span><b class="green">${money(mi)}</b></div><div class="item"><span>Expenses</span><b class="red">${money(me)}</b></div><div class="item"><span>Net</span><b>${money(mi-me)}</b></div>`;
+ const groups={};records.filter(x=>x.type==='expense').forEach(x=>groups[x.category]=(groups[x.category]||0)+x.amount);
+ const cats=Object.entries(groups).sort((a,b)=>b[1]-a[1]);$('categories').innerHTML=cats.length?cats.map(([k,v])=>`<div class="item"><span>${esc(k)}</span><b>${money(v)}</b></div>`).join(''):'<div class="empty">No expense data yet.</div>';
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('entry').addEventListener('submit',e=>{e.preventDefault();let amount=Number($('amount').value);if(!(amount>0))return;records.push({id:Date.now(),type:$('type').value,amount,category:$('category').value,date:$('date').value,note:$('note').value.trim()});$('amount').value='';$('note').value='';save()});
+$('entries').addEventListener('click',e=>{let id=e.target.dataset.del;if(id&&confirm('Delete this transaction?')){records=records.filter(x=>x.id!==Number(id));save()}});
+document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));['transactions','reports','backup'].forEach(id=>$(id).classList.toggle('hidden',id!==b.dataset.tab))}));
+$('export').onclick=()=>{let blob=new Blob([JSON.stringify({app:'VAULT',version:1,records},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vault-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(a.href)};
+$('import').onchange=async e=>{try{let data=JSON.parse(await e.target.files[0].text());if(!Array.isArray(data.records))throw 0;if(confirm('Replace current data with this backup?')){records=data.records;save();alert('Backup imported.')}}catch(err){alert('Invalid backup file.')}e.target.value=''};
+$('clear').onclick=()=>{if(confirm('Permanently delete all transactions on this device?')){records=[];save()}};
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+render();
+</script>
+</body></html>
